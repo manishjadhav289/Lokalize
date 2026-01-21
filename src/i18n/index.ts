@@ -14,25 +14,21 @@ const LokaliseBackend: BackendModule = {
     },
     read: async (language: string, namespace: string, callback: (err: any, data: any) => void) => {
         try {
-            console.log(`🔄 Fetching ${language} translations from Lokalise API...`);
+            // Sanitize language code to 2 chars (Lokalise usually uses 'en', 'es', etc.)
+            const langIso = language.split('-')[0]; 
+            console.log(`🔄 Fetching translations for '${langIso}' (requested: '${language}') from Lokalise /keys endpoint...`);
 
-            // Step 1: Request file download from Lokalise API
-            const apiUrl = `https://api.lokalise.com/api2/projects/${LOKALISE_PROJECT_ID}/files/download`;
+            // Use /keys endpoint to get raw keys and translations
+            const apiUrl = `https://api.lokalise.com/api2/projects/${LOKALISE_PROJECT_ID}/keys?include_translations=1&limit=5000`;
 
             console.log('📍 API URL:', apiUrl);
 
             const response = await fetch(apiUrl, {
-                method: 'POST',
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Api-Token': LOKALISE_API_TOKEN,
                 },
-                body: JSON.stringify({
-                    format: 'json',
-                    original_filenames: false,
-                    bundle_structure: '%LANG_ISO%.json',
-                    filter_langs: [language],
-                }),
             });
 
             console.log('📡 API Response status:', response.status);
@@ -40,57 +36,36 @@ const LokaliseBackend: BackendModule = {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('❌ API Error:', errorText);
-                callback(new Error(`API failed: ${response.status}`), null);
+                callback(new Error(`API failed: ${response.status} ${errorText}`), null);
                 return;
             }
 
-            const data = await response.json();
-            console.log('✅ API Response:', JSON.stringify(data).substring(0, 300));
+            const data = await response.json() as any;
+            console.log(`✅ API Response: ${data.keys?.length || 0} keys fetched`);
 
-            if (!data.bundle_url) {
-                console.error('❌ No bundle_url in response');
-                callback(new Error('No bundle_url'), null);
-                return;
+            if (!data.keys || !Array.isArray(data.keys)) {
+                 console.error('❌ No keys found in response');
+                 callback(new Error('No keys found'), null);
+                 return;
             }
 
-            // Step 2: Download the bundle (it's a ZIP file)
-            console.log('📦 Downloading bundle from:', data.bundle_url);
-
-            const bundleResponse = await fetch(data.bundle_url);
-            const arrayBuffer = await bundleResponse.arrayBuffer();
-
-            console.log('✅ Bundle downloaded, size:', arrayBuffer.byteLength);
-
-            // Step 3: Extract the ZIP file
-            console.log('📂 Extracting ZIP file...');
-            const zip = await JSZip.loadAsync(arrayBuffer);
-
-            // Find the JSON file for this language
-            const jsonFileName = `${language}.json`;
-            console.log('🔍 Looking for:', jsonFileName);
-
-            const files = Object.keys(zip.files);
-            console.log('📁 Files in ZIP:', files);
-
-            let translationData: any = null;
-
-            for (const fileName of files) {
-                if (fileName.endsWith('.json')) {
-                    console.log('📄 Found JSON file:', fileName);
-                    const content = await zip.files[fileName].async('string');
-                    console.log('📄 Content:', content.substring(0, 300));
-                    translationData = JSON.parse(content);
-                    break;
+            // Transform keys into { key: value } map for the requested language
+            const translations: Record<string, string> = {};
+            
+            data.keys.forEach((keyObj: any) => {
+                const keyName = keyObj.key_name.web || keyObj.key_name.other || keyObj.key_name.ios || keyObj.key_name.android;
+                
+                // Find translation for the requested language
+                const translationObj = keyObj.translations.find((t: any) => t.language_iso === langIso);
+                
+                if (keyName && translationObj && translationObj.translation) {
+                    translations[keyName] = translationObj.translation;
                 }
-            }
+            });
 
-            if (translationData) {
-                console.log('✅ Parsed translations:', translationData);
-                callback(null, translationData);
-            } else {
-                console.error('❌ No JSON file found in ZIP');
-                callback(new Error('No JSON file in ZIP'), null);
-            }
+            console.log(`✅ Parsed ${Object.keys(translations).length} translations for ${langIso}`);
+            console.log(`📝 Sample keys:`, Object.keys(translations).slice(0, 5));
+            callback(null, translations);
 
         } catch (error) {
             console.error('❌ Error:', error);

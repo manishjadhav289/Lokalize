@@ -42,11 +42,14 @@ function App() {
     <SafeAreaView style={backgroundStyle}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.container}>
-        <Text style={[styles.title, textStyle]}>{t('body')}</Text>
-        <Text style={[styles.subtitle, textStyle]}>{t('welcome_header')}</Text>
+        <Text style={[styles.title, textStyle]}>{t('long_term_bu_title')}</Text>
+        <Text style={[styles.subtitle, textStyle]}>{t('change_access_pricing_title')}</Text>
+        <Text style={[styles.subtitle, textStyle]}>{t('offer_summary_title')}</Text>
 
         <TouchableOpacity style={styles.button} onPress={toggleLanguage}>
-          <Text style={styles.buttonText}>{t('switch_language')}</Text>
+          <Text style={styles.buttonText}>
+            {i18n.language.startsWith('en') ? 'Cambiar a Español' : 'Switch to English'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -74,11 +77,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 8,
+    marginBottom: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
   buttonText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
+  },
+  termsText: {
+    marginTop: 20,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 10,
+  },
+  link: {
+    color: '#007AFF',
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
   },
 });
 
